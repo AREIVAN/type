@@ -4,6 +4,16 @@
 export { cefrConfigs, cefrOptions, cefrLabels, type CEFRConfig } from './cefrConfig';
 export { practiceGoalConfigs, practiceGoalOptions, practiceGoalLabels, type PracticeGoalConfig } from './practiceGoalConfig';
 export { lengthConfigs, lengthOptions, type LengthConfig } from './lengthConfig';
+export {
+  blanksModes,
+  cefrLevels,
+  generationRetryPolicy,
+  lengths,
+  practiceGoals,
+  qualityThresholdsByLength,
+  spanishHints,
+  type QualityThreshold,
+} from './domainRules';
 export { 
   spanishHintOptions, 
   blanksModeOptions, 

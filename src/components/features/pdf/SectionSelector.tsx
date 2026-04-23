@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { FileText, ChevronRight, Check, Search, Loader2, FolderOpen } from 'lucide-react';
+import { FileText, ChevronRight, Check, Search, Loader2 } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -18,9 +18,10 @@ interface SectionSelectorProps {
   pdfName: string;
   onSelect: (section: Section) => void;
   isLoading?: boolean;
+  pagesLabel?: string;
 }
 
-export function SectionSelector({ sections, pdfName, onSelect, isLoading }: SectionSelectorProps) {
+export function SectionSelector({ sections, pdfName, onSelect, isLoading, pagesLabel }: SectionSelectorProps) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [previewSection, setPreviewSection] = useState<Section | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -51,6 +52,7 @@ export function SectionSelector({ sections, pdfName, onSelect, isLoading }: Sect
         <div>
           <h2 className="text-xl font-semibold text-zinc-100">{pdfName}</h2>
           <p className="text-sm text-zinc-500">{sections.length} sections available</p>
+          {pagesLabel && <p className="text-xs text-zinc-500 mt-1">{pagesLabel}</p>}
         </div>
       </div>
 

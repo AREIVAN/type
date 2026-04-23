@@ -1,10 +1,8 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import { Sparkles, Loader2, ChevronRight, Check, RotateCcw, Wand2, ArrowLeft, ArrowRight, ChevronDown } from 'lucide-react';
-import { cn } from '@/utils/cn';
+import { Sparkles, Loader2, ChevronRight, Check, RotateCcw, Wand2, ArrowLeft, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
-import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorBanner } from '@/components/ui/ErrorBanner';
 import { CEFRLevel, PracticeGoal, Length, GeneratedContent, SpanishHints, BlanksMode } from '@/types';
 import { cefrConfigs } from '@/config/ai-generation/cefrConfig';
@@ -18,7 +16,6 @@ interface AIGeneratorProps {
   generatedContent: GeneratedContent | null;
   isGenerating: boolean;
   error?: string | null;
-  onErrorDismiss?: () => void;
 }
 
 export function AIGenerator({ 
@@ -26,8 +23,7 @@ export function AIGenerator({
   onSelect, 
   generatedContent, 
   isGenerating, 
-  error, 
-  onErrorDismiss 
+  error
 }: AIGeneratorProps) {
   const [cefrLevel, setCefrLevel] = useState<CEFRLevel>('B1');
   const [practiceGoal, setPracticeGoal] = useState<PracticeGoal>('daily-conversations');
@@ -57,7 +53,6 @@ export function AIGenerator({
 
   const showEmptyState = !generatedContent && !isGenerating && !error;
   const cefrConfig = cefrConfigs[cefrLevel];
-  const goalConfig = practiceGoalConfigs[practiceGoal];
 
   // Options for dropdowns
   const cefrOptions = Object.entries(cefrConfigs).map(([key, config]) => ({
@@ -96,7 +91,7 @@ export function AIGenerator({
           message={error}
           action={{
             label: 'Try Again',
-            onClick: () => onErrorDismiss?.(),
+            onClick: handleGenerate,
           }}
           className="mb-4"
         />
@@ -314,7 +309,7 @@ export function AIGenerator({
       {/* Info */}
       <div className="p-2.5 bg-zinc-900/30 border border-zinc-800/40 rounded-lg">
         <p className="text-[10px] text-zinc-600 text-center">
-          Pre-written templates. Real AI would generate unlimited content.
+          Texts are generated securely on the server via Groq.
         </p>
       </div>
     </div>

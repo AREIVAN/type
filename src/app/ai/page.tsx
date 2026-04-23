@@ -1,12 +1,12 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { Header } from '@/components/layout/Header';
 import { AIGenerator } from '@/components/features/ai/AIGenerator';
-import { generatePracticeText } from '@/services/ai-service/mocks';
+import { generatePracticeText } from '@/services/ai-service';
 import { CEFRLevel, PracticeGoal, Length, GeneratedContent, SpanishHints, BlanksMode } from '@/types';
 
 export default function AIPage() {
@@ -14,21 +14,6 @@ export default function AIPage() {
   const [generatedContent, setGeneratedContent] = useState<GeneratedContent | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [currentParams, setCurrentParams] = useState<{
-    cefrLevel: CEFRLevel;
-    practiceGoal: PracticeGoal;
-    length: Length;
-    learningSupport?: { spanishHints: SpanishHints; blanksMode: BlanksMode };
-  } | null>(null);
-
-  // Load any saved content on mount
-  useEffect(() => {
-    const savedText = sessionStorage.getItem('practice_text');
-    const savedSource = sessionStorage.getItem('practice_source');
-    
-    // If there's a previous AI session, could restore it
-    // For now, we start fresh
-  }, []);
 
   const handleGenerate = useCallback(async (params: { 
     cefrLevel: CEFRLevel; 
@@ -38,17 +23,21 @@ export default function AIPage() {
   }) => {
     setIsGenerating(true);
     setError(null);
-    setCurrentParams(params);
     
     try {
       const content = await generatePracticeText({
         cefrLevel: params.cefrLevel,
         practiceGoal: params.practiceGoal,
         length: params.length,
+        learningSupport: params.learningSupport,
       });
       setGeneratedContent(content);
     } catch (err) {
-      setError('Failed to generate content. Please try again.');
+      if (err instanceof Error && err.message) {
+        setError(err.message);
+      } else {
+        setError('Failed to generate content. Please try again.');
+      }
     } finally {
       setIsGenerating(false);
     }
@@ -99,7 +88,6 @@ export default function AIPage() {
           generatedContent={generatedContent}
           isGenerating={isGenerating}
           error={error}
-          onErrorDismiss={() => setError(null)}
         />
       </main>
     </div>

@@ -5,20 +5,43 @@ import { useRouter } from 'next/navigation';
 import { ArrowLeft, FileText } from 'lucide-react';
 import { Header } from '@/components/layout/Header';
 import { PdfUploader } from '@/components/features/pdf/PdfUploader';
+import { PdfPageSelector } from '@/components/features/pdf/PdfPageSelector';
 import { SectionSelector } from '@/components/features/pdf/SectionSelector';
-import { parsePdf, ParseResult, ParsedPdf } from '@/services/pdf-parser';
+import { ParseProgress, ParseResult, ParsedPdf } from '@/services/pdf-parser';
+import { applyPageSelectionToParsedPdf, PageSelectionCriteria } from '@/services/pdf-parser/page-selection';
 import Link from 'next/link';
 
 export default function PdfPage() {
   const router = useRouter();
+  const [sourceFile, setSourceFile] = useState<File | null>(null);
+  const [sourceParsedData, setSourceParsedData] = useState<ParsedPdf | null>(null);
   const [parsedData, setParsedData] = useState<ParsedPdf | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [selectionError, setSelectionError] = useState<string | null>(null);
+  const [parseProgress, setParseProgress] = useState<ParseProgress | null>(null);
 
-  const handleUpload = useCallback(async (result: ParseResult) => {
+  const handleUpload = useCallback((file: File, result: ParseResult) => {
     if (result.success) {
+      setSourceFile(file);
+      setSourceParsedData(result.data);
       setParsedData(result.data);
+      setSelectionError(null);
+      setParseProgress(null);
     }
   }, []);
+
+  const handlePageSelectionChange = useCallback((criteria: PageSelectionCriteria) => {
+    if (!sourceParsedData) return;
+
+    const filtered = applyPageSelectionToParsedPdf(sourceParsedData, criteria);
+
+    if (!filtered.success) {
+      setSelectionError(filtered.error.message);
+      return;
+    }
+
+    setSelectionError(null);
+    setParsedData(filtered.data);
+  }, [sourceParsedData]);
 
   const handleSectionSelect = useCallback((section: { id: string; title: string; content: string }) => {
     // Store the text in session storage for the practice page
@@ -28,11 +51,6 @@ export default function PdfPage() {
     
     router.push('/practice');
   }, [router]);
-
-  // Reset to upload view
-  const handleBack = () => {
-    setParsedData(null);
-  };
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -51,12 +69,30 @@ export default function PdfPage() {
         </div>
 
         {parsedData ? (
-          <SectionSelector
-            sections={parsedData.sections}
-            pdfName={parsedData.name}
-            onSelect={handleSectionSelect}
-            isLoading={isLoading}
-          />
+          <div className="mx-auto flex w-full max-w-6xl flex-col gap-6">
+            {sourceFile && sourceParsedData && (
+              <PdfPageSelector
+                key={`${sourceFile.name}-${sourceFile.size}-${sourceFile.lastModified}`}
+                file={sourceFile}
+                totalPages={sourceParsedData.pageCount}
+                onSelectionChange={handlePageSelectionChange}
+              />
+            )}
+
+            {selectionError && (
+              <div className="rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+                {selectionError}
+              </div>
+            )}
+
+            <SectionSelector
+              sections={parsedData.sections}
+              pdfName={parsedData.name}
+              onSelect={handleSectionSelect}
+              isLoading={false}
+              pagesLabel={`${parsedData.selectedPageCount} of ${parsedData.pageCount} pages included`}
+            />
+          </div>
         ) : (
           <div className="max-w-4xl mx-auto">
             <div className="text-center mb-12">
@@ -71,7 +107,13 @@ export default function PdfPage() {
               </p>
             </div>
 
-            <PdfUploader onUpload={handleUpload} />
+            {parseProgress && (
+              <div className="mb-6 rounded-xl border border-zinc-800 bg-zinc-900/60 px-4 py-3 text-sm text-zinc-300">
+                Processing page {parseProgress.current} of {parseProgress.total} (source page {parseProgress.pageNumber})
+              </div>
+            )}
+
+            <PdfUploader onUpload={handleUpload} onProgressChange={setParseProgress} />
           </div>
         )}
       </main>

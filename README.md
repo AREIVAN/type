@@ -126,7 +126,8 @@ type/
 │   │   │   ├── index.ts
 │   │   │   └── dictionary.ts      # ~270 words
 │   │   └── ai-service/
-│   │       └── mocks.ts           # High-quality templates
+│   │       ├── index.ts           # Client adapter for /api/ai/generate
+│   │       └── mocks.ts           # Legacy templates
 │   │
 │   ├── store/                    # Zustand stores
 │   │   ├── useSessionStore.ts
@@ -173,6 +174,9 @@ cd type
 # Install dependencies
 npm install
 
+# Configure server env vars
+cp .env.example .env.local
+
 # Start development server
 npm run dev
 ```
@@ -190,9 +194,24 @@ npm start
 
 ## Environment Variables
 
-Currently, no environment variables are required. The MVP uses:
-- Local storage for data persistence
-- Mock services for AI and vocabulary
+AI generation now runs through a secure Next.js server endpoint (`/api/ai/generate`) that calls Groq.
+
+Required:
+
+```bash
+GROQ_API_KEY=gsk_...
+```
+
+Optional:
+
+```bash
+GROQ_MODEL=llama-3.1-8b-instant
+GROQ_TIMEOUT_MS=15000
+```
+
+Notes:
+- `GROQ_API_KEY` is server-only. Do not expose it in client code or `NEXT_PUBLIC_*` vars.
+- Use `.env.local` for local development.
 
 ---
 
