@@ -234,8 +234,8 @@ function getFallbackContent(_cefr: CEFRLevel, _goal: PracticeGoal, _length: Leng
   };
   
   return {
-    text: fallbacks[cefr],
-    title: `${cefr} Practice`,
+    text: fallbacks[_cefr],
+    title: `${_cefr} Practice`,
     keyVocabulary: ['practice', 'typing', 'vocabulary', 'learn', 'improve'],
     suggestedBlankWords: ['practice', 'vocabulary'],
   };
