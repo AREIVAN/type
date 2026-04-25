@@ -146,7 +146,40 @@ export interface AISessionMetadata {
   title: string;
 }
 
-export type SessionMetadata = VerbSessionMetadata | AISessionMetadata;
+export interface PdfPagePracticeItem {
+  pageNumber: number;
+  text: string;
+  characterCount: number;
+}
+
+export interface PdfPageMetrics {
+  pageNumber: number;
+  selectedPageIndex: number;
+  wpm: number;
+  accuracy: number;
+  errors: number;
+  time: number;
+  correctChars: number;
+  totalChars: number;
+}
+
+export interface PdfSessionMetadata {
+  type: 'pdf';
+  pdfName: string;
+  selectedPageNumbers: number[];
+  pagesCompleted: number[];
+  totalSelectedPages: number;
+  perPageMetrics?: PdfPageMetrics[];
+}
+
+export interface PdfPracticeSession {
+  pdfName: string;
+  selectedPages: PdfPagePracticeItem[];
+  currentPageIndex: number;
+  completedPages: number[];
+}
+
+export type SessionMetadata = VerbSessionMetadata | AISessionMetadata | PdfSessionMetadata;
 
 export interface SessionMetrics {
   wpm: number;

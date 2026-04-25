@@ -2,7 +2,6 @@
 
 import { useState, useCallback, useEffect } from 'react';
 import { BookOpen, X, History, Loader2 } from 'lucide-react';
-import { cn } from '@/utils/cn';
 import { lookupWord } from '@/services/vocabulary-service';
 import { WordDefinition } from '@/types';
 import { saveRecentWord, getRecentWords, StoredWord } from '@/utils/storage';
@@ -16,13 +15,10 @@ interface WordDefinitionPanelProps {
 export function WordDefinitionPanel({ isOpen, onClose, selectedWord }: WordDefinitionPanelProps) {
   const [definition, setDefinition] = useState<WordDefinition | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [recentWords, setRecentWords] = useState<StoredWord[]>([]);
   const [error, setError] = useState<string | null>(null);
 
-  // Load recent words on mount
-  useEffect(() => {
-    setRecentWords(getRecentWords());
-  }, []);
+  // Initialize recent words with lazy initializer
+  const [recentWords, setRecentWords] = useState<StoredWord[]>(() => getRecentWords());
 
   const handleWordClick = useCallback(async (word: string) => {
     if (!word.trim()) return;
@@ -51,19 +47,22 @@ export function WordDefinitionPanel({ isOpen, onClose, selectedWord }: WordDefin
         setDefinition(null);
         setError(`No definition found for "${cleanWord}"`);
       }
-    } catch (err) {
+    } catch {
       setError('Failed to look up word');
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps -- setRecentWords is stable
 
-  // Handle selected word from typing area
+  // Handle selected word from typing area - use deferred execution to avoid sync setState in effect
   useEffect(() => {
     if (selectedWord) {
-      handleWordClick(selectedWord);
+      const timer = setTimeout(() => {
+        handleWordClick(selectedWord);
+      }, 0);
+      return () => clearTimeout(timer);
     }
-  }, [selectedWord, handleWordClick]);
+  }, [selectedWord]); // eslint-disable-line react-hooks/exhaustive-deps -- handleWordClick would cause infinite loop if included
 
   if (!isOpen) return null;
 

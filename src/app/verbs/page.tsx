@@ -19,6 +19,7 @@ import {
 } from '@/features/verb-practice/helpers';
 import { generateVerbPracticeItems } from '@/services/ai-service';
 import { useHistoryStore } from '@/store/useHistoryStore';
+import { formatTime } from '@/utils/metrics';
 import { getFailedVerbs, saveFailedVerbs } from '@/utils/storage';
 import { VerbPracticeAnswerResult, VerbPracticeItem, VerbPracticeTrack, VerbPracticeType } from '@/types';
 
@@ -292,7 +293,7 @@ export default function VerbsPage() {
                 <div className="flex items-center gap-4 text-sm">
                   <span className="text-emerald-400">Correct: {correctCount}</span>
                   <span className="text-red-400">Incorrect: {incorrectCount}</span>
-                  <span className="text-cyan-300">Avg recall: {(averageRecallTimeMs / 1000).toFixed(1)}s</span>
+                  <span className="text-cyan-300">Avg recall: {formatTime(averageRecallTimeMs / 1000)}</span>
                   <span className="text-zinc-400">Mastery: {masteryPercentage}%</span>
                   <span className="text-zinc-500 capitalize">Source: {generationSource}</span>
                 </div>
@@ -319,7 +320,7 @@ export default function VerbsPage() {
                     <span>WPM: {wpm}</span>
                     <span>Accuracy: {accuracy}%</span>
                     <span>Errors: {orderedResults.reduce((total, result) => total + result.errors, 0)}</span>
-                    <span>Avg recall: {(averageRecallTimeMs / 1000).toFixed(1)}s</span>
+                    <span>Avg recall: {formatTime(averageRecallTimeMs / 1000)}</span>
                     <span>Correct forms: {correctCount}</span>
                     <span>Failed forms: {incorrectCount}</span>
                     <span>Mastery: {masteryPercentage}%</span>

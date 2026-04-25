@@ -5,7 +5,7 @@
  */
 export function normalizeText(text: string): string {
   // Remove excessive whitespace
-  let normalized = text
+  const normalized = text
     // Remove carriage returns
     .replace(/\r\n/g, '\n')
     .replace(/\r/g, '\n')

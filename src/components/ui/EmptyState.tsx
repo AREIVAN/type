@@ -1,6 +1,5 @@
 'use client';
 
-import { ReactNode } from 'react';
 import { cn } from '@/utils/cn';
 import { Button } from './Button';
 import { FileText, Sparkles, History, BookOpen, Settings, FolderOpen } from 'lucide-react';

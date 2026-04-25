@@ -9,6 +9,8 @@ import { PdfPageSelector } from '@/components/features/pdf/PdfPageSelector';
 import { SectionSelector } from '@/components/features/pdf/SectionSelector';
 import { ParseProgress, ParseResult, ParsedPdf } from '@/services/pdf-parser';
 import { applyPageSelectionToParsedPdf, PageSelectionCriteria } from '@/services/pdf-parser/page-selection';
+import { cleanSectionText, normalizeText } from '@/services/pdf-parser/normalizer';
+import type { PdfPracticeSession } from '@/types';
 import Link from 'next/link';
 
 export default function PdfPage() {
@@ -43,14 +45,39 @@ export default function PdfPage() {
     setParsedData(filtered.data);
   }, [sourceParsedData]);
 
-  const handleSectionSelect = useCallback((section: { id: string; title: string; content: string }) => {
-    // Store the text in session storage for the practice page
-    sessionStorage.setItem('practice_text', section.content);
+  const handleSectionSelect = useCallback(() => {
+    const selectedPages = parsedData?.textByPage
+      .map((page) => {
+        const text = cleanSectionText(normalizeText(page.text));
+
+        return {
+          pageNumber: page.pageNumber,
+          text,
+          characterCount: text.length,
+        };
+      })
+      .filter((page) => page.characterCount > 0) ?? [];
+
+    if (selectedPages.length === 0) {
+      setSelectionError('No selectable text found in the selected pages.');
+      return;
+    }
+
+    const pdfPracticeSession: PdfPracticeSession = {
+      pdfName: parsedData?.name ?? sourceFile?.name ?? 'PDF Practice',
+      selectedPages,
+      currentPageIndex: 0,
+      completedPages: [],
+    };
+
+    sessionStorage.setItem('practice_text', selectedPages[0].text);
     sessionStorage.setItem('practice_source', 'pdf');
-    sessionStorage.setItem('practice_title', section.title);
+    sessionStorage.setItem('practice_title', 'PDF Practice');
+    sessionStorage.setItem('practice_pdf_session', JSON.stringify(pdfPracticeSession));
+    sessionStorage.removeItem('practice_metadata');
     
     router.push('/practice');
-  }, [router]);
+  }, [parsedData, router, sourceFile]);
 
   return (
     <div className="min-h-screen flex flex-col">

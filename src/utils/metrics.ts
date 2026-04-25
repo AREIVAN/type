@@ -15,9 +15,9 @@ export function calculateAccuracy(correct: number, total: number): number {
 
 export function formatTime(seconds: number): string {
   const mins = Math.floor(seconds / 60);
-  const secs = seconds % 60;
+  const secs = (seconds % 60).toFixed(2);
   if (mins > 0) {
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
+    return `${mins}:${secs.padStart(5, '0')}`;
   }
   return `${secs}s`;
 }

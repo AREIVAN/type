@@ -115,10 +115,20 @@ export default function HistoryPage() {
                               {session.metadata.track} • {session.metadata.finalCount} verbs • {session.metadata.generationSource}
                             </span>
                           )}
+                          {session.metadata?.type === 'pdf' && (
+                            <span className="text-xs text-red-300">
+                              {session.metadata.pagesCompleted.length}/{session.metadata.totalSelectedPages} pages
+                            </span>
+                          )}
                         </div>
                         {session.metadata?.type === 'verbs' && (
                           <p className="mt-1 text-xs text-zinc-500">
                             {session.metadata.correctCount ?? 0} correct / {session.metadata.incorrectCount ?? 0} incorrect
+                          </p>
+                        )}
+                        {session.metadata?.type === 'pdf' && (
+                          <p className="mt-1 text-xs text-zinc-500">
+                            {session.metadata.pdfName} • PDF pages {session.metadata.selectedPageNumbers.join(', ')}
                           </p>
                         )}
                       </div>

@@ -9,9 +9,11 @@ interface TypingAreaProps {
   characters: CharacterState[];
   status: 'idle' | 'active' | 'completed';
   onInput: (input: string) => void;
+  onDelete?: () => void;
+  allowCorrections?: boolean;
 }
 
-export function TypingArea({ characters, status, onInput }: TypingAreaProps) {
+export function TypingArea({ characters, status, onInput, onDelete, allowCorrections = false }: TypingAreaProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [isFocused, setIsFocused] = useState(false);
@@ -39,38 +41,28 @@ export function TypingArea({ characters, status, onInput }: TypingAreaProps) {
   }, [onInput]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
-    // Prevent default for most keys to avoid browser shortcuts
-    // Allow Ctrl+A (select all), Ctrl+C (copy), etc.
     if (e.ctrlKey || e.metaKey) return;
-    
-    // Handle special keys
-    if (e.key === 'Backspace') {
-      // Don't allow backspace - it's a forward-only typing test
+
+    if (e.key === 'Backspace' || e.key === 'Delete') {
       e.preventDefault();
+      if (allowCorrections) {
+        onDelete?.();
+      }
       return;
     }
-  }, []);
 
-  // Find current word for highlighting
-  const currentIndex = characters.findIndex(c => c.status === 'current');
-  let currentWord = '';
-  let wordStart = 0;
-  
-  if (currentIndex >= 0) {
-    // Find word start
-    let start = currentIndex;
-    while (start > 0 && characters[start - 1].char !== ' ' && characters[start - 1].char !== '\n') {
-      start--;
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      if (allowCorrections) {
+        const currentCharIndex = characters.findIndex(c => c.status === 'current');
+        const nextChar = characters[currentCharIndex];
+        if (nextChar && nextChar.char === '\n') {
+          onInput('\n');
+        }
+      }
+      return;
     }
-    wordStart = start;
-    
-    // Find word end
-    let end = currentIndex;
-    while (end < characters.length && characters[end].char !== ' ' && characters[end].char !== '\n') {
-      end++;
-    }
-    currentWord = characters.slice(start, end).map(c => c.char).join('');
-  }
+  }, [allowCorrections, onDelete, onInput, characters]);
 
   return (
     <div 

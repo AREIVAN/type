@@ -151,6 +151,7 @@ const templates: Record<CEFRLevel, Record<PracticeGoal, PracticeTemplate[]>> = {
 };
 
 // Get templates with fallback
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function getTemplates(cefr: CEFRLevel, goal: PracticeGoal, length: Length): PracticeTemplate[] {
   const goalTemplates = templates[cefr]?.[goal];
   
@@ -222,9 +223,8 @@ export async function generatePracticeText(params: {
 }
 
 // Fallback content generator
-function getFallbackContent(cefr: CEFRLevel, goal: PracticeGoal, length: Length): PracticeTemplate {
-  const wordCounts = { short: 60, medium: 100, long: 180 };
-  
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+function getFallbackContent(_cefr: CEFRLevel, _goal: PracticeGoal, _length: Length): PracticeTemplate {
   const fallbacks: Record<CEFRLevel, string> = {
     A1: "This is a simple practice text for beginners. It uses basic vocabulary and short sentences. You can practice typing common words and phrases.",
     A2: "This practice text is designed for elementary learners. It includes everyday vocabulary and straightforward grammar structures to help you improve your typing skills.",

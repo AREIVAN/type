@@ -24,11 +24,56 @@ export interface TypingEngineState {
 
 interface UseTypingEngineOptions {
   text: string;
+  allowCorrections?: boolean;
   onComplete?: (metrics: TypingEngineState['metrics']) => void;
   onProgress?: (metrics: TypingEngineState['metrics'], progress: number) => void;
 }
 
-export function useTypingEngine({ text, onComplete, onProgress }: UseTypingEngineOptions) {
+export function applyTypingCorrection(prev: TypingEngineState, text: string, elapsed: number): TypingEngineState {
+  if (prev.currentIndex <= 0) return prev;
+
+  const previousIndex = prev.currentIndex - 1;
+  const previousCharacter = prev.characters[previousIndex];
+  const newCharacters = [...prev.characters];
+
+  if (prev.currentIndex < newCharacters.length) {
+    newCharacters[prev.currentIndex] = {
+      ...newCharacters[prev.currentIndex],
+      status: 'pending',
+    };
+  }
+
+  newCharacters[previousIndex] = {
+    ...previousCharacter,
+    status: 'current',
+  };
+
+  const newCorrectChars = previousCharacter.status === 'correct'
+    ? Math.max(0, prev.metrics.correctChars - 1)
+    : prev.metrics.correctChars;
+  const newErrors = previousCharacter.status === 'incorrect'
+    ? Math.max(0, prev.metrics.errors - 1)
+    : prev.metrics.errors;
+  const totalChars = text.length;
+  const metrics = {
+    wpm: calculateWPM(newCorrectChars, elapsed),
+    accuracy: calculateAccuracy(newCorrectChars, newCorrectChars + newErrors),
+    errors: newErrors,
+    correctChars: newCorrectChars,
+    totalChars,
+    time: elapsed,
+  };
+
+  return {
+    ...prev,
+    characters: newCharacters,
+    currentIndex: previousIndex,
+    status: 'active',
+    metrics,
+  };
+}
+
+export function useTypingEngine({ text, allowCorrections = false, onComplete, onProgress }: UseTypingEngineOptions) {
   const [state, setState] = useState<TypingEngineState>(() => initializeState(text));
   const startTimeRef = useRef<number | null>(null);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -37,6 +82,7 @@ export function useTypingEngine({ text, onComplete, onProgress }: UseTypingEngin
   // Initialize state when text changes
   useEffect(() => {
     isCompletedRef.current = false;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- the engine state must reset when a new practice text is loaded.
     setState(initializeState(text));
     startTimeRef.current = null;
     if (intervalRef.current) {
@@ -172,6 +218,21 @@ export function useTypingEngine({ text, onComplete, onProgress }: UseTypingEngin
     });
   }, [state, text, onComplete, onProgress, updateMetrics]);
 
+  const handleDelete = useCallback(() => {
+    if (!allowCorrections || isCompletedRef.current) return;
+
+    setState(prev => {
+      const elapsed = startTimeRef.current ? (Date.now() - startTimeRef.current) / 1000 : prev.metrics.time;
+      const next = applyTypingCorrection(prev, text, elapsed);
+      if (next === prev) return prev;
+
+      const progress = next.currentIndex / text.length;
+      onProgress?.(next.metrics, progress);
+
+      return next;
+    });
+  }, [allowCorrections, onProgress, text]);
+
   const reset = useCallback(() => {
     isCompletedRef.current = false;
     startTimeRef.current = null;
@@ -198,6 +259,7 @@ export function useTypingEngine({ text, onComplete, onProgress }: UseTypingEngin
   return {
     state,
     handleInput,
+    handleDelete,
     reset,
     restart,
   };
