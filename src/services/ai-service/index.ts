@@ -1,4 +1,13 @@
-import { BlanksMode, CEFRLevel, GeneratedContent, Length, PracticeGoal, SpanishHints } from '@/types';
+import {
+  BlanksMode,
+  CEFRLevel,
+  GeneratedContent,
+  GenerateVerbPracticeRequest,
+  GenerateVerbPracticeResponse,
+  Length,
+  PracticeGoal,
+  SpanishHints,
+} from '@/types';
 import {
   blanksModes as allowedBlanksModes,
   cefrLevels as allowedCefrLevels,
@@ -95,4 +104,45 @@ export async function generatePracticeText(params: GeneratePracticeTextParams): 
     ...payload.data,
     createdAt: new Date(payload.data.createdAt),
   };
+}
+
+export async function generateVerbPracticeItems(
+  params: GenerateVerbPracticeRequest
+): Promise<NonNullable<GenerateVerbPracticeResponse['data']>> {
+  const abortController = new AbortController();
+  const timeout = setTimeout(() => abortController.abort(), CLIENT_TIMEOUT_MS);
+
+  let response: Response;
+
+  try {
+    response = await fetch('/api/ai/verbs', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(params),
+      cache: 'no-store',
+      signal: abortController.signal,
+    });
+  } catch (error: unknown) {
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      throw new Error('The verb request took too long. Please try again.');
+    }
+
+    throw new Error('Network error while generating verb practice. Please retry.');
+  } finally {
+    clearTimeout(timeout);
+  }
+
+  const payload = (await response.json().catch(() => null)) as GenerateVerbPracticeResponse | null;
+
+  if (!response.ok) {
+    throw new Error(payload?.error ?? 'Could not generate verb practice right now.');
+  }
+
+  if (!payload?.data?.items?.length) {
+    throw new Error('Invalid response from verb practice endpoint.');
+  }
+
+  return payload.data;
 }

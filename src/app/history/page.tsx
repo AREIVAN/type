@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Clock, Trash2, FileText, Sparkles, PenLine } from 'lucide-react';
+import { ArrowLeft, Clock, Trash2, FileText, Sparkles, PenLine, Languages } from 'lucide-react';
 import { Header } from '@/components/layout/Header';
 import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -12,12 +12,14 @@ const sourceIcons = {
   pdf: FileText,
   ai: Sparkles,
   manual: PenLine,
+  verbs: Languages,
 };
 
 const sourceColors = {
   pdf: 'text-red-400 bg-red-500/20',
   ai: 'text-purple-400 bg-purple-500/20',
   manual: 'text-emerald-400 bg-emerald-500/20',
+  verbs: 'text-cyan-400 bg-cyan-500/20',
 };
 
 export default function HistoryPage() {
@@ -108,7 +110,17 @@ export default function HistoryPage() {
                           <span className="text-xs text-zinc-500 capitalize">
                             {session.source}
                           </span>
+                          {session.metadata?.type === 'verbs' && (
+                            <span className="text-xs text-cyan-300">
+                              {session.metadata.track} • {session.metadata.finalCount} verbs • {session.metadata.generationSource}
+                            </span>
+                          )}
                         </div>
+                        {session.metadata?.type === 'verbs' && (
+                          <p className="mt-1 text-xs text-zinc-500">
+                            {session.metadata.correctCount ?? 0} correct / {session.metadata.incorrectCount ?? 0} incorrect
+                          </p>
+                        )}
                       </div>
                     </div>
                     

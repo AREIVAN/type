@@ -1,4 +1,5 @@
 // Local storage utilities
+import { VerbPracticeItem, VerbSessionMetadata } from '@/types';
 
 const PREFIX = 'typelearn_';
 
@@ -46,6 +47,22 @@ export interface StoredSession {
   errors: number;
   time: number;
   completedAt: string;
+  metadata?: VerbSessionMetadata;
+}
+
+const FAILED_VERBS_KEY = 'failed_verbs';
+
+export function getFailedVerbs(): VerbPracticeItem[] {
+  return getItem<VerbPracticeItem[]>(FAILED_VERBS_KEY, []);
+}
+
+export function saveFailedVerbs(items: VerbPracticeItem[]): void {
+  const unique = new Map<string, VerbPracticeItem>();
+  for (const item of items) {
+    unique.set(item.text.trim().toLowerCase(), item);
+  }
+
+  setItem(FAILED_VERBS_KEY, Array.from(unique.values()).slice(0, 50));
 }
 
 export function getHistory(): StoredSession[] {

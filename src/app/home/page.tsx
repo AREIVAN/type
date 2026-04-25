@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { FileText, Sparkles, PenLine, ArrowRight, Clock, TrendingUp, BookOpen } from 'lucide-react';
+import { FileText, Sparkles, PenLine, ArrowRight, Clock, TrendingUp, BookOpen, Languages } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { Button } from '@/components/ui/Button';
 import { Header } from '@/components/layout/Header';
@@ -33,6 +33,16 @@ const modes = [
     href: '/manual',
     color: 'from-emerald-500/20 to-teal-500/20',
     iconColor: 'text-emerald-400',
+  },
+  {
+    id: 'verbs',
+    title: 'Verb Trainer',
+    description: 'Practice common verbs by tense, translation, and real sentence usage.',
+    icon: Languages,
+    href: '/verbs',
+    color: 'from-cyan-500/20 to-blue-500/20',
+    iconColor: 'text-cyan-400',
+    badge: 'New',
   },
 ];
 
@@ -86,13 +96,19 @@ export default function HomePage() {
               Choose Your Practice Mode
             </h2>
             
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               {modes.map((mode) => (
                 <Link
                   key={mode.id}
                   href={mode.href}
                   className="group relative p-6 rounded-xl bg-zinc-900/50 border border-zinc-800 hover:border-zinc-700 transition-all duration-300 hover:-translate-y-1"
                 >
+                  {mode.badge && (
+                    <span className="absolute right-4 top-4 z-10 rounded-full border border-cyan-400/30 bg-cyan-500/10 px-2 py-0.5 text-xs font-medium text-cyan-300">
+                      {mode.badge}
+                    </span>
+                  )}
+
                   {/* Gradient background */}
                   <div className={cn(
                     'absolute inset-0 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300',
