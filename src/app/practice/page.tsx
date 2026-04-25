@@ -12,16 +12,40 @@ import { useTypingEngine, TypingEngineState } from '@/features/typing/hooks/useT
 import { useHistoryStore } from '@/store/useHistoryStore';
 import { Button } from '@/components/ui/Button';
 import { useKeyboardShortcuts, SHORTCUTS_HELP } from '@/hooks/useKeyboardShortcuts';
-import { cn } from '@/utils/cn';
+import { SessionMetadata } from '@/types';
+
+function getStoredPracticeMetadata(): SessionMetadata | undefined {
+  if (typeof window === 'undefined') {
+    return undefined;
+  }
+
+  const storedMetadata = sessionStorage.getItem('practice_metadata');
+  if (!storedMetadata) {
+    return undefined;
+  }
+
+  try {
+    return JSON.parse(storedMetadata) as SessionMetadata;
+  } catch {
+    return undefined;
+  }
+}
 
 export default function PracticePage() {
   const router = useRouter();
   const addToHistory = useHistoryStore(s => s.add);
   const typingAreaRef = useRef<HTMLDivElement>(null);
   
-  const [text, setText] = useState('');
-  const [source, setSource] = useState<'pdf' | 'ai' | 'manual'>('manual');
-  const [title, setTitle] = useState('');
+  const [text] = useState(() => (typeof window === 'undefined' ? '' : sessionStorage.getItem('practice_text') ?? ''));
+  const [source] = useState<'pdf' | 'ai' | 'manual'>(() => {
+    if (typeof window === 'undefined') {
+      return 'manual';
+    }
+
+    return (sessionStorage.getItem('practice_source') as 'pdf' | 'ai' | 'manual' | null) ?? 'manual';
+  });
+  const [title] = useState(() => (typeof window === 'undefined' ? '' : sessionStorage.getItem('practice_title') ?? ''));
+  const [metadata] = useState<SessionMetadata | undefined>(() => getStoredPracticeMetadata());
   const [showVocabulary, setShowVocabulary] = useState(false);
   const [selectedWord, setSelectedWord] = useState<string | null>(null);
   const [isCompleted, setIsCompleted] = useState(false);
@@ -29,21 +53,10 @@ export default function PracticePage() {
 
   // Load text from session storage on mount
   useEffect(() => {
-    const storedText = sessionStorage.getItem('practice_text');
-    const storedSource = sessionStorage.getItem('practice_source');
-    const storedTitle = sessionStorage.getItem('practice_title');
-    
-    if (storedText) {
-      setText(storedText);
-    } else {
-      // Redirect back if no text
+    if (!text) {
       router.push('/home');
-      return;
     }
-    
-    if (storedSource) setSource(storedSource as 'pdf' | 'ai' | 'manual');
-    if (storedTitle) setTitle(storedTitle);
-  }, [router]);
+  }, [router, text]);
 
   const handleComplete = useCallback((metrics: TypingEngineState['metrics']) => {
     setIsCompleted(true);
@@ -58,8 +71,9 @@ export default function PracticePage() {
       accuracy: metrics.accuracy,
       errors: metrics.errors,
       time: Math.round(metrics.time),
+      metadata,
     });
-  }, [addToHistory, source, title, text]);
+  }, [addToHistory, source, title, text, metadata]);
 
   const handleProgress = useCallback((metrics: TypingEngineState['metrics'], progress: number) => {
     // Can be used for real-time updates
@@ -85,6 +99,7 @@ export default function PracticePage() {
     sessionStorage.removeItem('practice_text');
     sessionStorage.removeItem('practice_source');
     sessionStorage.removeItem('practice_title');
+    sessionStorage.removeItem('practice_metadata');
     router.push('/home');
   }, [router]);
 

@@ -3,6 +3,27 @@
 // CEFR Levels (replaces Level)
 export type CEFRLevel = 'A1' | 'A2' | 'B1' | 'B2' | 'C1';
 export type VerbPracticeTrack = CEFRLevel | 'technical-engineering';
+export type VerbPracticeForm = 'base' | 'pastSimple' | 'pastParticiple' | 'gerund' | 'thirdPerson';
+export type VerbPracticeType = VerbPracticeForm | 'mixed';
+export type PracticeTopic =
+  | 'daily-conversation'
+  | 'work'
+  | 'travel'
+  | 'job-interview'
+  | 'emails'
+  | 'meetings'
+  | 'engineering'
+  | 'maintenance'
+  | 'automation'
+  | 'technical-vocabulary';
+export type PracticeObjective =
+  | 'vocabulary'
+  | 'reading-fluency'
+  | 'spelling-accuracy'
+  | 'common-verbs'
+  | 'technical-english'
+  | 'weak-words-review'
+  | 'business-english';
 
 // Practice Goals (replaces Category)
 export type PracticeGoal = 
@@ -42,15 +63,25 @@ export interface Session {
   completedAt?: Date;
   status: SessionStatus;
   metrics: SessionMetrics;
-  metadata?: VerbSessionMetadata;
+  metadata?: SessionMetadata;
 }
 
 export interface VerbPracticeItem {
   id: string;
+  base: string;
+  spanish: string;
+  pastSimple: string;
+  pastParticiple: string;
+  gerund: string;
+  thirdPerson: string;
+  targetForm: VerbPracticeForm;
   text: string;
   translationEs: string;
   track: VerbPracticeTrack;
+  level?: VerbPracticeTrack;
+  category?: string;
   example?: string;
+  examples?: Partial<Record<VerbPracticeForm, string>>;
 }
 
 export type VerbPracticeGenerationSource = 'ai' | 'fallback';
@@ -58,6 +89,7 @@ export type VerbPracticeGenerationSource = 'ai' | 'fallback';
 export interface GenerateVerbPracticeRequest {
   count: number;
   track: VerbPracticeTrack;
+  practiceType?: VerbPracticeType;
 }
 
 export interface GenerateVerbPracticeResponse {
@@ -74,16 +106,22 @@ export interface GenerateVerbPracticeResponse {
 
 export interface VerbPracticeAnswerResult {
   itemId: string;
+  base: string;
+  spanish: string;
+  targetForm: VerbPracticeForm;
   text: string;
   translationEs: string;
   expected: string;
   answer: string;
   correct: boolean;
+  recallTimeMs: number;
+  errors: number;
 }
 
 export interface VerbSessionMetadata {
   type: 'verbs';
   track: VerbPracticeTrack;
+  practiceType?: VerbPracticeType;
   requestedCount: number;
   finalCount: number;
   generationSource: VerbPracticeGenerationSource;
@@ -91,7 +129,24 @@ export interface VerbSessionMetadata {
   answers?: VerbPracticeAnswerResult[];
   correctCount?: number;
   incorrectCount?: number;
+  failedCount?: number;
+  averageRecallTimeMs?: number;
+  masteryPercentage?: number;
 }
+
+export interface AISessionMetadata {
+  type: 'ai';
+  generationSource: 'ai' | 'fallback';
+  cefrLevel: CEFRLevel;
+  topic: PracticeTopic;
+  objective: PracticeObjective;
+  weakWordsUsed: string[];
+  technicalVocabularyUsed: string[];
+  textLength: Length;
+  title: string;
+}
+
+export type SessionMetadata = VerbSessionMetadata | AISessionMetadata;
 
 export interface SessionMetrics {
   wpm: number;
@@ -120,11 +175,17 @@ export interface GeneratedContent {
   // New CEFR fields
   cefrLevel?: CEFRLevel;
   practiceGoal?: PracticeGoal;
+  topic?: PracticeTopic;
+  objective?: PracticeObjective;
   length?: Length;
   // Learning support
   keyVocabulary?: string[];
+  keywordsUsed?: string[];
   suggestedBlankWords?: string[];
-  estimatedDifficulty?: number;
+  estimatedDifficulty?: string;
+  generationSource?: 'ai' | 'fallback';
+  weakWordsUsed?: string[];
+  technicalVocabularyUsed?: string[];
   // Metadata
   createdAt: Date;
 }

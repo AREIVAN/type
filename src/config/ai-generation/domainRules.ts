@@ -1,6 +1,7 @@
-import { BlanksMode, CEFRLevel, Length, PracticeGoal, SpanishHints } from '@/types';
+import { BlanksMode, CEFRLevel, Length, PracticeGoal, PracticeObjective, PracticeTopic, SpanishHints } from '@/types';
 import { cefrConfigs } from './cefrConfig';
 import { lengthConfigs } from './lengthConfig';
+import { objectiveOptions, topicOptions } from './personalizationConfig';
 import { practiceGoalConfigs } from './practiceGoalConfig';
 
 function typedKeys<T extends string>(value: Record<T, unknown>): T[] {
@@ -9,6 +10,8 @@ function typedKeys<T extends string>(value: Record<T, unknown>): T[] {
 
 export const cefrLevels = typedKeys(cefrConfigs) as readonly CEFRLevel[];
 export const practiceGoals = typedKeys(practiceGoalConfigs) as readonly PracticeGoal[];
+export const practiceTopics = topicOptions.map(option => option.value) as readonly PracticeTopic[];
+export const practiceObjectives = objectiveOptions.map(option => option.value) as readonly PracticeObjective[];
 export const lengths = typedKeys(lengthConfigs) as readonly Length[];
 
 export const spanishHints: readonly SpanishHints[] = ['off', 'key-words', 'full'];

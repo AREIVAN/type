@@ -12,29 +12,50 @@ import {
   cefrLevels as allowedCefrLevels,
   generationRetryPolicy,
   lengths as allowedLengths,
+  practiceObjectives as allowedPracticeObjectives,
   practiceGoals as allowedPracticeGoals,
+  practiceTopics as allowedPracticeTopics,
   qualityThresholdsByLength,
   spanishHints as allowedSpanishHints,
 } from '@/config/ai-generation/domainRules';
 import { lengthConfigs } from '@/config/ai-generation/lengthConfig';
-import { practiceGoalConfigs } from '@/config/ai-generation/practiceGoalConfig';
-import { BlanksMode, CEFRLevel, GeneratedContent, Length, PracticeGoal, SpanishHints } from '@/types';
+import {
+  getObjectiveLabel,
+  getObjectivePrompt,
+  getTopicLabel,
+  getTopicPrompt,
+  requiresTechnicalVocabulary,
+} from '@/config/ai-generation/personalizationConfig';
+import {
+  BlanksMode,
+  CEFRLevel,
+  GeneratedContent,
+  Length,
+  PracticeGoal,
+  PracticeObjective,
+  PracticeTopic,
+  SpanishHints,
+} from '@/types';
 
 export const runtime = 'nodejs';
 
 interface GenerateRequest {
   cefrLevel: CEFRLevel;
-  practiceGoal: PracticeGoal;
+  practiceGoal?: PracticeGoal;
+  topic: PracticeTopic;
+  objective: PracticeObjective;
   length: Length;
+  useWeakWords?: boolean;
+  weakWords?: string[];
   learningSupport?: { spanishHints: SpanishHints; blanksMode: BlanksMode };
 }
 
 interface LLMOutput {
   title?: string;
   text: string;
-  keyVocabulary?: string[];
+  keywordsUsed?: string[];
   suggestedBlankWords?: string[];
-  estimatedDifficulty?: number;
+  estimatedDifficulty?: string;
 }
 
 type ApiErrorCode =
@@ -79,15 +100,27 @@ function parseRequest(body: unknown): { ok: true; data: GenerateRequest } | { ok
 
   const cefrLevel = body.cefrLevel;
   const practiceGoal = body.practiceGoal;
+  const topic = body.topic;
+  const objective = body.objective;
   const length = body.length;
+  const useWeakWords = body.useWeakWords === true;
+  const weakWords = sanitizeList(body.weakWords, 12);
   const learningSupport = body.learningSupport;
 
   if (!isEnumValue(cefrLevel, allowedCefrLevels)) {
     return { ok: false, error: 'Invalid cefrLevel.' };
   }
 
-  if (!isEnumValue(practiceGoal, allowedPracticeGoals)) {
+  if (typeof practiceGoal !== 'undefined' && !isEnumValue(practiceGoal, allowedPracticeGoals)) {
     return { ok: false, error: 'Invalid practiceGoal.' };
+  }
+
+  if (!isEnumValue(topic, allowedPracticeTopics)) {
+    return { ok: false, error: 'Invalid topic.' };
+  }
+
+  if (!isEnumValue(objective, allowedPracticeObjectives)) {
+    return { ok: false, error: 'Invalid objective.' };
   }
 
   if (!isEnumValue(length, allowedLengths)) {
@@ -100,7 +133,11 @@ function parseRequest(body: unknown): { ok: true; data: GenerateRequest } | { ok
       data: {
         cefrLevel,
         practiceGoal,
+        topic,
+        objective,
         length,
+        useWeakWords,
+        weakWords,
         learningSupport: { spanishHints: 'off', blanksMode: 'off' },
       },
     };
@@ -126,7 +163,11 @@ function parseRequest(body: unknown): { ok: true; data: GenerateRequest } | { ok
     data: {
       cefrLevel,
       practiceGoal,
+      topic,
+      objective,
       length,
+      useWeakWords,
+      weakWords,
       learningSupport: { spanishHints: selectedSpanishHints, blanksMode: selectedBlanksMode },
     },
   };
@@ -176,11 +217,11 @@ function parseLLMOutput(raw: string): LLMOutput | null {
     return {
       title: typeof parsed.title === 'string' ? parsed.title.trim() : undefined,
       text,
-      keyVocabulary: sanitizeList(parsed.keyVocabulary, 10),
+      keywordsUsed: sanitizeList(parsed.keywordsUsed, 10),
       suggestedBlankWords: sanitizeList(parsed.suggestedBlankWords, 8),
       estimatedDifficulty:
-        typeof parsed.estimatedDifficulty === 'number'
-          ? Math.max(1, Math.min(10, Math.round(parsed.estimatedDifficulty)))
+        typeof parsed.estimatedDifficulty === 'string'
+          ? parsed.estimatedDifficulty.trim().slice(0, 80)
           : undefined,
     };
   } catch {
@@ -226,10 +267,14 @@ function validateGeneratedOutput(output: LLMOutput, input: GenerateRequest): Gen
     issues.push(`Vocabulary variety is too low (${uniqueWords} unique words; minimum ${threshold.minUniqueWords}).`);
   }
 
-  if (output.keyVocabulary && output.keyVocabulary.length < threshold.minKeyVocabulary) {
+  if (!output.keywordsUsed || output.keywordsUsed.length < threshold.minKeyVocabulary) {
     issues.push(
-      `keyVocabulary has ${output.keyVocabulary.length} item(s); minimum is ${threshold.minKeyVocabulary}.`
+      `keywordsUsed has ${output.keywordsUsed?.length ?? 0} item(s); minimum is ${threshold.minKeyVocabulary}.`
     );
+  }
+
+  if (!output.estimatedDifficulty) {
+    issues.push('estimatedDifficulty is required as a short string.');
   }
 
   if (/([A-Za-z])\1{5,}/.test(output.text)) {
@@ -252,12 +297,23 @@ function validateGeneratedOutput(output: LLMOutput, input: GenerateRequest): Gen
 
 function buildUserPrompt(input: GenerateRequest, retryFeedback: string[] = []): string {
   const cefrConfig = cefrConfigs[input.cefrLevel];
-  const goalConfig = practiceGoalConfigs[input.practiceGoal];
   const lengthConfig = lengthConfigs[input.length];
   const threshold = qualityThresholdsByLength[input.length];
+  const topicLabel = getTopicLabel(input.topic);
+  const objectiveLabel = getObjectiveLabel(input.objective);
+  const technicalVocabularyRequired = requiresTechnicalVocabulary(input.topic, input.objective);
   const supportHint = input.learningSupport
     ? `Spanish hints: ${input.learningSupport.spanishHints}. Blanks mode: ${input.learningSupport.blanksMode}.`
     : 'Spanish hints: off. Blanks mode: off.';
+  const weakWords = input.useWeakWords ? input.weakWords ?? [] : [];
+  const weakWordsSection = weakWords.length > 0
+    ? `Naturally include these learner weak words when possible: ${weakWords.join(', ')}. Do not list them separately in the main text.`
+    : input.useWeakWords
+      ? 'The learner asked to use weak words, but no weak words were available. Generate normal practice text without mentioning this.'
+      : 'Weak words are not requested.';
+  const technicalSection = technicalVocabularyRequired
+    ? 'Include technical vocabulary naturally and coherently. Keep it level-appropriate, especially for A1/A2.'
+    : 'Do not force technical vocabulary unless it fits the topic naturally.';
 
   const retrySection =
     retryFeedback.length === 0
@@ -265,18 +321,25 @@ function buildUserPrompt(input: GenerateRequest, retryFeedback: string[] = []): 
       : `Previous attempt issues: ${retryFeedback.map((issue, index) => `${index + 1}) ${issue}`).join(' ')}. Regenerate fixing every issue.`;
 
   return [
-    'Create one cohesive typing-practice passage in ENGLISH for an ESL learner.',
+    'Create one cohesive typing-practice passage in plain English for a Spanish speaker learning English.',
+    'The output is for typing practice, so it must be natural, coherent, and comfortable to type.',
     `CEFR level: ${input.cefrLevel}.`,
     `CEFR profile: vocabulary ${cefrConfig.vocabularyComplexity}, sentence structure ${cefrConfig.sentenceStructure}, grammar focus ${cefrConfig.grammarFocus.join(', ')}.`,
-    `Practice goal: ${input.practiceGoal} (${goalConfig.label}). Focus on ${goalConfig.generationFocus}.`,
+    `Topic: ${topicLabel}. Topic focus: ${getTopicPrompt(input.topic)}.`,
+    `Practice objective: ${objectiveLabel}. Objective focus: ${getObjectivePrompt(input.objective)}.`,
     `Target length: ${lengthConfig.wordCount.min}-${lengthConfig.wordCount.max} words.`,
     `Quality minimums: at least ${threshold.minSentences} sentences and ${threshold.minUniqueWords} unique words.`,
-    'The text must be grammatically correct and contextually coherent from beginning to end.',
+    'The text must be grammatically correct and contextually coherent from beginning to end. Avoid repetitive robotic phrasing.',
+    'For A1 and A2, use short sentences, common words, and simple punctuation. Avoid overly complex sentences.',
+    'Do not include markdown. Do not include translations inside the main text. Do not include Spanish in the main text.',
+    'Keep punctuation appropriate to the selected CEFR level.',
+    weakWordsSection,
+    technicalSection,
     supportHint,
     retrySection,
     'Return ONLY valid JSON with this schema:',
-    '{"title": string, "text": string, "keyVocabulary": string[], "suggestedBlankWords": string[], "estimatedDifficulty": number}',
-    'Rules: strict JSON only, no markdown, no explanations, no additional keys, estimatedDifficulty from 1 to 10.',
+    '{"title": string, "text": string, "level": "A1"|"A2"|"B1"|"B2"|"C1", "topic": string, "objective": string, "keywordsUsed": string[], "estimatedDifficulty": string}',
+    'Rules: strict JSON only, no markdown, no explanations, no additional keys. level, topic, and objective must match the request.',
   ].join(' ');
 }
 
@@ -326,7 +389,7 @@ export async function POST(request: Request) {
           {
             role: 'system',
             content:
-              'You are an English content generator for ESL typing practice. Follow requested CEFR level, goal, and length exactly. Output strict JSON only.',
+              'You generate plain-English ESL typing practice for Spanish speakers. Follow CEFR level, topic, objective, weak-word, technical-vocabulary, and length constraints exactly. Output strict JSON only.',
           },
           {
             role: 'user',
@@ -368,14 +431,22 @@ export async function POST(request: Request) {
 
     const content: GeneratedContent = {
       id: crypto.randomUUID(),
-      title: generated.title,
+      title: generated.title || `${getTopicLabel(parsed.data.topic)} Practice`,
       text: generated.text,
       cefrLevel: parsed.data.cefrLevel,
       practiceGoal: parsed.data.practiceGoal,
+      topic: parsed.data.topic,
+      objective: parsed.data.objective,
       length: parsed.data.length,
-      keyVocabulary: generated.keyVocabulary,
+      keyVocabulary: generated.keywordsUsed,
+      keywordsUsed: generated.keywordsUsed,
       suggestedBlankWords: generated.suggestedBlankWords,
       estimatedDifficulty: generated.estimatedDifficulty,
+      generationSource: 'ai',
+      weakWordsUsed: parsed.data.useWeakWords ? parsed.data.weakWords ?? [] : [],
+      technicalVocabularyUsed: requiresTechnicalVocabulary(parsed.data.topic, parsed.data.objective)
+        ? generated.keywordsUsed?.slice(0, 8) ?? []
+        : [],
       createdAt: new Date(),
     };
 

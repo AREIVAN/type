@@ -1,17 +1,26 @@
 'use client';
 
-import { useState, useCallback } from 'react';
-import { Sparkles, Loader2, ChevronRight, Check, RotateCcw, Wand2, ArrowLeft, ArrowRight } from 'lucide-react';
+import { useState, useCallback, useRef } from 'react';
+import { Sparkles, Loader2, ChevronRight, Check, RotateCcw, Wand2, ArrowLeft, ArrowRight, Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { ErrorBanner } from '@/components/ui/ErrorBanner';
-import { CEFRLevel, PracticeGoal, Length, GeneratedContent, SpanishHints, BlanksMode } from '@/types';
+import { CEFRLevel, Length, GeneratedContent, SpanishHints, BlanksMode, PracticeObjective, PracticeTopic } from '@/types';
 import { cefrConfigs } from '@/config/ai-generation/cefrConfig';
-import { practiceGoalConfigs } from '@/config/ai-generation/practiceGoalConfig';
 import { lengthConfigs } from '@/config/ai-generation/lengthConfig';
+import { getObjectiveLabel, getTopicLabel, objectiveOptions, topicOptions } from '@/config/ai-generation/personalizationConfig';
 import { spanishHintOptions, blanksModeOptions, defaultLearningSupport } from '@/config/ai-generation';
+import { getWeakWords } from '@/utils/storage';
 
 interface AIGeneratorProps {
-  onGenerate: (params: { cefrLevel: CEFRLevel; practiceGoal: PracticeGoal; length: Length; learningSupport?: { spanishHints: SpanishHints; blanksMode: BlanksMode } }) => Promise<void>;
+  onGenerate: (params: {
+    cefrLevel: CEFRLevel;
+    topic: PracticeTopic;
+    objective: PracticeObjective;
+    length: Length;
+    useWeakWords: boolean;
+    weakWords: string[];
+    learningSupport?: { spanishHints: SpanishHints; blanksMode: BlanksMode };
+  }) => Promise<void>;
   onSelect: (content: GeneratedContent) => void;
   generatedContent: GeneratedContent | null;
   isGenerating: boolean;
@@ -26,17 +35,37 @@ export function AIGenerator({
   error
 }: AIGeneratorProps) {
   const [cefrLevel, setCefrLevel] = useState<CEFRLevel>('B1');
-  const [practiceGoal, setPracticeGoal] = useState<PracticeGoal>('daily-conversations');
+  const [topic, setTopic] = useState<PracticeTopic>('daily-conversation');
+  const [objective, setObjective] = useState<PracticeObjective>('reading-fluency');
   const [length, setLength] = useState<Length>('medium');
+  const [useWeakWords, setUseWeakWords] = useState(false);
+  const [weakWords] = useState<string[]>(() => getWeakWords());
   const [spanishHints, setSpanishHints] = useState<SpanishHints>(defaultLearningSupport.spanishHints);
   const [blanksMode, setBlanksMode] = useState<BlanksMode>(defaultLearningSupport.blanksMode);
+  const titleInputRef = useRef<HTMLInputElement>(null);
+  const textAreaRef = useRef<HTMLTextAreaElement>(null);
 
   const handleGenerate = async () => {
     await onGenerate({ 
       cefrLevel, 
-      practiceGoal, 
+      topic,
+      objective,
       length,
+      useWeakWords,
+      weakWords: useWeakWords ? weakWords : [],
       learningSupport: { spanishHints, blanksMode }
+    });
+  };
+
+  const handleStartPractice = () => {
+    if (!generatedContent) {
+      return;
+    }
+
+    onSelect({
+      ...generatedContent,
+      title: titleInputRef.current?.value.trim() || generatedContent.title,
+      text: textAreaRef.current?.value.trim() || generatedContent.text,
     });
   };
 
@@ -56,11 +85,6 @@ export function AIGenerator({
 
   // Options for dropdowns
   const cefrOptions = Object.entries(cefrConfigs).map(([key, config]) => ({
-    value: key,
-    label: config.label
-  }));
-
-  const practiceGoalOptions = Object.entries(practiceGoalConfigs).map(([key, config]) => ({
     value: key,
     label: config.label
   }));
@@ -97,9 +121,9 @@ export function AIGenerator({
         />
       )}
 
-      {/* Main Configuration Row - 3 columns */}
+      {/* Main Configuration */}
       {showEmptyState && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
           {/* CEFR Level */}
           <div className="space-y-1.5">
             <label className="text-xs font-medium text-zinc-500 uppercase tracking-wide">CEFR Level</label>
@@ -114,15 +138,29 @@ export function AIGenerator({
             </select>
           </div>
 
-          {/* Practice Goal */}
+          {/* Topic */}
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-zinc-500 uppercase tracking-wide">Practice Goal</label>
+            <label className="text-xs font-medium text-zinc-500 uppercase tracking-wide">Topic</label>
             <select
-              value={practiceGoal}
-              onChange={(e) => setPracticeGoal(e.target.value as PracticeGoal)}
+              value={topic}
+              onChange={(e) => setTopic(e.target.value as PracticeTopic)}
               className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2.5 text-sm text-zinc-200 font-medium focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all"
             >
-              {practiceGoalOptions.map((opt) => (
+              {topicOptions.map((opt) => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Practice Objective */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-zinc-500 uppercase tracking-wide">Objective</label>
+            <select
+              value={objective}
+              onChange={(e) => setObjective(e.target.value as PracticeObjective)}
+              className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2.5 text-sm text-zinc-200 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
+            >
+              {objectiveOptions.map((opt) => (
                 <option key={opt.value} value={opt.value}>{opt.label}</option>
               ))}
             </select>
@@ -141,6 +179,27 @@ export function AIGenerator({
               ))}
             </select>
           </div>
+        </div>
+      )}
+
+      {showEmptyState && (
+        <div className="mb-4 p-3 bg-zinc-900/50 border border-zinc-800/60 rounded-lg">
+          <label className="flex items-center justify-between gap-3 cursor-pointer">
+            <span>
+              <span className="block text-sm font-medium text-zinc-200">Use my weak words</span>
+              <span className="block text-xs text-zinc-500">
+                {weakWords.length > 0
+                  ? `${weakWords.slice(0, 5).join(', ')}${weakWords.length > 5 ? '...' : ''}`
+                  : 'No weak words found yet. Generation will continue normally.'}
+              </span>
+            </span>
+            <input
+              type="checkbox"
+              checked={useWeakWords}
+              onChange={(event) => setUseWeakWords(event.target.checked)}
+              className="h-4 w-4 rounded border-zinc-700 bg-zinc-950 accent-blue-500"
+            />
+          </label>
         </div>
       )}
 
@@ -208,7 +267,7 @@ export function AIGenerator({
                 {generatedContent.cefrLevel}
               </span>
               <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-400 border border-purple-500/30">
-                {practiceGoalConfigs[generatedContent.practiceGoal as PracticeGoal]?.label.split(' ')[0] || 'Goal'}
+                {generatedContent.topic ? getTopicLabel(generatedContent.topic) : 'Topic'}
               </span>
               <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
                 {generatedContent.length}
@@ -218,21 +277,36 @@ export function AIGenerator({
 
           {/* Content */}
           <div className="p-4">
-            {generatedContent.title && (
-              <h3 className="text-base font-medium text-zinc-200 mb-2">
-                {generatedContent.title}
-              </h3>
+            {generatedContent.generationSource === 'fallback' && (
+              <div className="mb-3 rounded-lg border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
+                AI generation was unavailable, so we used a fallback practice text.
+              </div>
             )}
-            <p className="text-sm text-zinc-400 font-mono leading-relaxed whitespace-pre-wrap line-clamp-4">
-              {generatedContent.text}
-            </p>
+            <label className="mb-2 block text-[10px] text-zinc-600 uppercase tracking-wider">Title</label>
+            <input
+              ref={titleInputRef}
+              key={`title-${generatedContent.id}`}
+              defaultValue={generatedContent.title ?? ''}
+              className="mb-3 w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm font-medium text-zinc-200 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+            />
+            <label className="mb-2 flex items-center gap-1.5 text-[10px] text-zinc-600 uppercase tracking-wider">
+              <Pencil className="h-3 w-3" />
+              Preview and edit
+            </label>
+            <textarea
+              ref={textAreaRef}
+              key={`text-${generatedContent.id}`}
+              defaultValue={generatedContent.text}
+              rows={8}
+              className="w-full resize-y rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-3 font-mono text-sm leading-relaxed text-zinc-300 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+            />
 
             {/* Key Vocabulary */}
-            {generatedContent.keyVocabulary && generatedContent.keyVocabulary.length > 0 && (
+            {generatedContent.keywordsUsed && generatedContent.keywordsUsed.length > 0 && (
               <div className="mt-3 pt-3 border-t border-zinc-800/50">
-                <p className="text-[10px] text-zinc-600 uppercase tracking-wider mb-2">Key Vocabulary</p>
+                <p className="text-[10px] text-zinc-600 uppercase tracking-wider mb-2">Keywords Used</p>
                 <div className="flex flex-wrap gap-1.5">
-                  {generatedContent.keyVocabulary.slice(0, 6).map((word, idx) => (
+                  {generatedContent.keywordsUsed.slice(0, 8).map((word, idx) => (
                     <span 
                       key={idx}
                       className="px-1.5 py-0.5 bg-zinc-800/50 rounded text-[11px] text-zinc-500"
@@ -245,24 +319,16 @@ export function AIGenerator({
             )}
 
             {/* Difficulty */}
-            {generatedContent.estimatedDifficulty && (
-              <div className="mt-3 flex items-center gap-2">
-                <span className="text-[10px] text-zinc-600">Difficulty:</span>
-                <div className="flex-1 max-w-[60px] h-1 bg-zinc-800 rounded-full overflow-hidden">
-                  <div 
-                    className="h-full bg-gradient-to-r from-green-500 to-red-500"
-                    style={{ width: `${(generatedContent.estimatedDifficulty / 10) * 100}%` }}
-                  />
-                </div>
-                <span className="text-[10px] text-zinc-500">{generatedContent.estimatedDifficulty}/10</span>
-              </div>
-            )}
+            <div className="mt-3 flex flex-wrap gap-2 text-[10px] text-zinc-500">
+              <span>Objective: {generatedContent.objective ? getObjectiveLabel(generatedContent.objective) : 'Practice'}</span>
+              {generatedContent.estimatedDifficulty && <span>Difficulty: {generatedContent.estimatedDifficulty}</span>}
+            </div>
           </div>
 
           {/* Actions */}
           <div className="px-4 py-3 border-t border-zinc-800 flex items-center gap-2">
             <Button
-              onClick={() => onSelect(generatedContent)}
+              onClick={handleStartPractice}
               className="flex-1"
               size="sm"
             >

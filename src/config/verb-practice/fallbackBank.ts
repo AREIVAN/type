@@ -1,4 +1,4 @@
-import { VerbPracticeItem, VerbPracticeTrack } from '@/types';
+import { VerbPracticeForm, VerbPracticeItem, VerbPracticeTrack } from '@/types';
 
 export const verbPracticeTracks = [
   'A1',
@@ -11,6 +11,84 @@ export const verbPracticeTracks = [
 
 export const MIN_VERB_COUNT = 1;
 export const MAX_VERB_COUNT = 30;
+
+type VerbBankEntry = {
+  base: string;
+  spanish: string;
+  level: VerbPracticeTrack;
+  category: string;
+  pastSimple?: string;
+  pastParticiple?: string;
+  gerund?: string;
+  thirdPerson?: string;
+  examples?: Partial<Record<VerbPracticeForm, string>>;
+};
+
+const irregularForms: Record<string, Partial<Pick<VerbBankEntry, 'pastSimple' | 'pastParticiple' | 'thirdPerson'>>> = {
+  be: { pastSimple: 'was', pastParticiple: 'been', thirdPerson: 'is' },
+  have: { pastSimple: 'had', pastParticiple: 'had', thirdPerson: 'has' },
+  go: { pastSimple: 'went', pastParticiple: 'gone' },
+  come: { pastSimple: 'came', pastParticiple: 'come' },
+  make: { pastSimple: 'made', pastParticiple: 'made' },
+  do: { pastSimple: 'did', pastParticiple: 'done', thirdPerson: 'does' },
+  see: { pastSimple: 'saw', pastParticiple: 'seen' },
+  bring: { pastSimple: 'brought', pastParticiple: 'brought' },
+  choose: { pastSimple: 'chose', pastParticiple: 'chosen' },
+  forget: { pastSimple: 'forgot', pastParticiple: 'forgotten' },
+  learn: { pastSimple: 'learned', pastParticiple: 'learned' },
+};
+
+function buildGerund(base: string): string {
+  if (base === 'be') return 'being';
+  if (base === 'die') return 'dying';
+  if (base.endsWith('ie')) return `${base.slice(0, -2)}ying`;
+  if (base.endsWith('e') && !base.endsWith('ee')) return `${base.slice(0, -1)}ing`;
+  return `${base}ing`;
+}
+
+function buildThirdPerson(base: string): string {
+  if (base.endsWith('y') && !/[aeiou]y$/.test(base)) return `${base.slice(0, -1)}ies`;
+  if (/(s|x|z|ch|sh|o)$/.test(base)) return `${base}es`;
+  return `${base}s`;
+}
+
+function buildPast(base: string): string {
+  if (base.endsWith('e')) return `${base}d`;
+  if (base.endsWith('y') && !/[aeiou]y$/.test(base)) return `${base.slice(0, -1)}ied`;
+  return `${base}ed`;
+}
+
+function makeEntry(
+  level: VerbPracticeTrack,
+  category: string,
+  base: string,
+  spanish: string,
+  baseExample: string
+): VerbBankEntry {
+  const irregular = irregularForms[base] ?? {};
+  const pastSimple = irregular.pastSimple ?? buildPast(base);
+  const pastParticiple = irregular.pastParticiple ?? pastSimple;
+  const gerund = buildGerund(base);
+  const thirdPerson = irregular.thirdPerson ?? buildThirdPerson(base);
+
+  return {
+    base,
+    spanish,
+    level,
+    category,
+    pastSimple,
+    pastParticiple,
+    gerund,
+    thirdPerson,
+    examples: {
+      base: baseExample,
+      pastSimple: `I ${pastSimple} yesterday.`,
+      pastParticiple: `I have ${pastParticiple} before.`,
+      gerund: `I am ${gerund} now.`,
+      thirdPerson: `She ${thirdPerson} every day.`,
+    },
+  };
+}
 
 const items = {
   A1: [
@@ -89,15 +167,37 @@ const items = {
   ],
 } as const satisfies Record<VerbPracticeTrack, readonly (readonly [string, string, string])[]>;
 
+const verbEntries = Object.fromEntries(
+  Object.entries(items).map(([track, entries]) => [
+    track,
+    entries.map(([base, spanish, example]) =>
+      makeEntry(track as VerbPracticeTrack, track === 'technical-engineering' ? 'technical' : 'common', base, spanish, example)
+    ),
+  ])
+) as Record<VerbPracticeTrack, VerbBankEntry[]>;
+
 export const fallbackVerbBank: Record<VerbPracticeTrack, VerbPracticeItem[]> = Object.fromEntries(
   Object.entries(items).map(([track, entries]) => [
     track,
-    entries.map(([text, translationEs, example], index) => ({
-      id: `${track.toLowerCase()}-${index + 1}`,
-      text,
-      translationEs,
-      example,
-      track: track as VerbPracticeTrack,
-    })),
+    entries.map(([text, translationEs, example], index) => {
+      const entry = verbEntries[track as VerbPracticeTrack][index];
+      return {
+        id: `${track.toLowerCase()}-${index + 1}`,
+        base: entry.base,
+        spanish: entry.spanish,
+        pastSimple: entry.pastSimple ?? text,
+        pastParticiple: entry.pastParticiple ?? text,
+        gerund: entry.gerund ?? text,
+        thirdPerson: entry.thirdPerson ?? text,
+        targetForm: 'base',
+        text,
+        translationEs,
+        category: entry.category,
+        level: entry.level,
+        example,
+        examples: entry.examples,
+        track: track as VerbPracticeTrack,
+      };
+    }),
   ])
 ) as Record<VerbPracticeTrack, VerbPracticeItem[]>;

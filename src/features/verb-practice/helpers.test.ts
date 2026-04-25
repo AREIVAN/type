@@ -13,11 +13,19 @@ import {
   mapVerbTypingCharacters,
   normalizeVerbText,
   sanitizeVerbItems,
+  applyVerbPracticeType,
 } from './helpers';
 import { VerbPracticeItem } from '@/types';
 
 const makeItem = (text: string, id = text): VerbPracticeItem => ({
   id,
+  base: text.trim(),
+  spanish: `es-${text.trim()}`,
+  pastSimple: `${text.trim()}ed`,
+  pastParticiple: `${text.trim()}ed`,
+  gerund: `${text.trim()}ing`,
+  thirdPerson: `${text.trim()}s`,
+  targetForm: 'base',
   text,
   translationEs: `es-${text}`,
   track: 'A1',
@@ -40,10 +48,18 @@ test('normalizes and compares answers case-insensitively', () => {
   assert.equal(isCorrectVerbAnswer(' DEPLOY ', 'deploy'), true);
 });
 
-test('dedupes verb items by normalized English text', () => {
+test('dedupes verb items by normalized base and target form', () => {
   const deduped = dedupeVerbItems([makeItem('Deploy', 'one'), makeItem(' deploy ', 'two'), makeItem('debug')]);
 
   assert.deepEqual(deduped.map(item => item.id), ['one', 'debug']);
+});
+
+test('applies requested verb form while keeping Spanish helper out of target text', () => {
+  const [item] = applyVerbPracticeType([{ ...makeItem('go'), spanish: 'ir', pastSimple: 'went' }], 'pastSimple');
+
+  assert.equal(item.text, 'went');
+  assert.equal(item.translationEs, 'go → ir · past simple');
+  assert.equal(item.targetForm, 'pastSimple');
 });
 
 test('extracts submitted verb answers from supported separators', () => {

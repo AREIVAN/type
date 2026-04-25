@@ -120,6 +120,11 @@ export function VerbPracticeArea({
               );
             })}
           </div>
+          {items[currentIndex]?.example && !isDone && (
+            <p className="mt-5 max-w-2xl rounded-lg border border-zinc-800 bg-zinc-950/40 px-3 py-2 text-sm text-zinc-400">
+              Example: {items[currentIndex].example}
+            </p>
+          )}
         </div>
       </div>
     </section>

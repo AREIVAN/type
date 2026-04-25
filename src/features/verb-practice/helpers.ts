@@ -1,5 +1,5 @@
 import { fallbackVerbBank, MAX_VERB_COUNT, MIN_VERB_COUNT, verbPracticeTracks } from '@/config/verb-practice/fallbackBank';
-import { VerbPracticeItem, VerbPracticeTrack } from '@/types';
+import { VerbPracticeForm, VerbPracticeItem, VerbPracticeTrack, VerbPracticeType } from '@/types';
 
 export interface VerbItemRange {
   itemId: string;
@@ -14,8 +14,24 @@ export interface VerbTypingCharacter {
   status: VerbTypingCharacterStatus;
 }
 
+export const verbPracticeForms = ['base', 'pastSimple', 'pastParticiple', 'gerund', 'thirdPerson'] as const satisfies readonly VerbPracticeForm[];
+
+export const verbPracticeTypes = [...verbPracticeForms, 'mixed'] as const satisfies readonly VerbPracticeType[];
+
+export const verbPracticeFormLabels: Record<VerbPracticeForm, string> = {
+  base: 'base verb',
+  pastSimple: 'past simple',
+  pastParticiple: 'past participle',
+  gerund: 'gerund',
+  thirdPerson: 'third person',
+};
+
 export function isVerbPracticeTrack(value: unknown): value is VerbPracticeTrack {
   return typeof value === 'string' && verbPracticeTracks.includes(value as VerbPracticeTrack);
+}
+
+export function isVerbPracticeType(value: unknown): value is VerbPracticeType {
+  return typeof value === 'string' && verbPracticeTypes.includes(value as VerbPracticeType);
 }
 
 export function clampVerbCount(value: unknown): number {
@@ -33,6 +49,38 @@ export function normalizeVerbText(value: string): string {
 
 export function isCorrectVerbAnswer(answer: string, expected: string): boolean {
   return normalizeVerbText(answer) === normalizeVerbText(expected);
+}
+
+function getTargetForm(practiceType: VerbPracticeType, index: number): VerbPracticeForm {
+  return practiceType === 'mixed' ? verbPracticeForms[index % verbPracticeForms.length] : practiceType;
+}
+
+export function getVerbTarget(item: VerbPracticeItem, form: VerbPracticeForm): string {
+  return item[form] || item.base || item.text;
+}
+
+export function getVerbHelperText(item: VerbPracticeItem, form: VerbPracticeForm): string {
+  if (form === 'base') {
+    return item.spanish || item.translationEs;
+  }
+
+  return `${item.base} → ${item.spanish || item.translationEs} · ${verbPracticeFormLabels[form]}`;
+}
+
+export function applyVerbPracticeType(items: VerbPracticeItem[], practiceType: VerbPracticeType): VerbPracticeItem[] {
+  return items.map((item, index) => {
+    const targetForm = getTargetForm(practiceType, index);
+    const text = getVerbTarget(item, targetForm);
+
+    return {
+      ...item,
+      id: `${item.id}-${targetForm}`,
+      targetForm,
+      text,
+      translationEs: getVerbHelperText(item, targetForm),
+      example: item.examples?.[targetForm] ?? item.example,
+    };
+  });
 }
 
 export function extractSubmittedVerbAnswer(value: string): { answer: string; remainder: string } | null {
@@ -86,7 +134,7 @@ export function dedupeVerbItems(items: VerbPracticeItem[]): VerbPracticeItem[] {
   const unique: VerbPracticeItem[] = [];
 
   for (const item of items) {
-    const key = normalizeVerbText(item.text);
+    const key = `${normalizeVerbText(item.base || item.text)}:${item.targetForm ?? 'base'}`;
     if (!key || seen.has(key)) {
       continue;
     }
@@ -112,10 +160,16 @@ export function sanitizeVerbItems(items: unknown, track: VerbPracticeTrack): Ver
 
     const record = value as Record<string, unknown>;
     const text = typeof record.text === 'string' ? record.text.trim().replace(/\s+/g, ' ') : '';
+    const base = typeof record.base === 'string' ? record.base.trim().replace(/\s+/g, ' ') : text;
     const translationEs =
       typeof record.translationEs === 'string' ? record.translationEs.trim().replace(/\s+/g, ' ') : '';
+    const spanish = typeof record.spanish === 'string' ? record.spanish.trim().replace(/\s+/g, ' ') : translationEs;
     const example = typeof record.example === 'string' ? record.example.trim().replace(/\s+/g, ' ') : undefined;
     const itemTrack = isVerbPracticeTrack(record.track) ? record.track : track;
+    const pastSimple = typeof record.pastSimple === 'string' ? record.pastSimple.trim().replace(/\s+/g, ' ') : text;
+    const pastParticiple = typeof record.pastParticiple === 'string' ? record.pastParticiple.trim().replace(/\s+/g, ' ') : pastSimple;
+    const gerund = typeof record.gerund === 'string' ? record.gerund.trim().replace(/\s+/g, ' ') : text;
+    const thirdPerson = typeof record.thirdPerson === 'string' ? record.thirdPerson.trim().replace(/\s+/g, ' ') : text;
 
     if (!text || /\s/.test(text) || !translationEs || text.length > 80 || translationEs.length > 120 || itemTrack !== track) {
       continue;
@@ -123,9 +177,17 @@ export function sanitizeVerbItems(items: unknown, track: VerbPracticeTrack): Ver
 
     sanitized.push({
       id: typeof record.id === 'string' && record.id.trim() ? record.id.trim() : crypto.randomUUID(),
+      base,
+      spanish,
+      pastSimple,
+      pastParticiple,
+      gerund,
+      thirdPerson,
+      targetForm: 'base',
       text,
       translationEs,
       example: example || undefined,
+      level: track,
       track,
     });
   }
@@ -137,12 +199,14 @@ export function fillWithFallbackItems(
   items: VerbPracticeItem[],
   track: VerbPracticeTrack,
   count: number,
-  preferredItems: VerbPracticeItem[] = []
+  preferredItems: VerbPracticeItem[] = [],
+  practiceType: VerbPracticeType = 'base'
 ): VerbPracticeItem[] {
   const targetCount = clampVerbCount(count);
-  const base = dedupeVerbItems([...preferredItems, ...items]);
+  const base = dedupeVerbItems([...preferredItems, ...applyVerbPracticeType(items, practiceType)]);
   const fallback = fallbackVerbBank[track] ?? [];
-  return dedupeVerbItems([...base, ...fallback]).slice(0, Math.min(targetCount, fallback.length + base.length));
+  const typedFallback = applyVerbPracticeType(fallback, practiceType);
+  return dedupeVerbItems([...base, ...typedFallback]).slice(0, Math.min(targetCount, typedFallback.length + base.length));
 }
 
 export function buildVerbPracticeText(items: VerbPracticeItem[]): string {

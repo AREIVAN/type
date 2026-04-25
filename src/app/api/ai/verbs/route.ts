@@ -1,7 +1,12 @@
 import OpenAI from 'openai';
 import { NextResponse } from 'next/server';
-import { fillWithFallbackItems, isVerbPracticeTrack, sanitizeVerbItems } from '@/features/verb-practice/helpers';
-import { clampVerbCount } from '@/features/verb-practice/helpers';
+import {
+  clampVerbCount,
+  fillWithFallbackItems,
+  isVerbPracticeTrack,
+  isVerbPracticeType,
+  sanitizeVerbItems,
+} from '@/features/verb-practice/helpers';
 import { GenerateVerbPracticeRequest, VerbPracticeItem } from '@/types';
 
 export const runtime = 'nodejs';
@@ -27,7 +32,14 @@ function parseRequest(body: unknown): { ok: true; data: GenerateVerbPracticeRequ
     return { ok: false, error: 'Count must be between 1 and 30.' };
   }
 
-  return { ok: true, data: { count: clampVerbCount(count), track: record.track } };
+  return {
+    ok: true,
+    data: {
+      count: clampVerbCount(count),
+      track: record.track,
+      practiceType: isVerbPracticeType(record.practiceType) ? record.practiceType : 'base',
+    },
+  };
 }
 
 function stripCodeFence(value: string): string {
@@ -108,7 +120,7 @@ export async function POST(request: Request) {
     aiItems = [];
   }
 
-  const items = fillWithFallbackItems(aiItems, parsed.data.track, parsed.data.count);
+  const items = fillWithFallbackItems(aiItems, parsed.data.track, parsed.data.count, [], parsed.data.practiceType ?? 'base');
   const source = aiItems.length >= parsed.data.count ? 'ai' : 'fallback';
 
   if (items.length === 0) {

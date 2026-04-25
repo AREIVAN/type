@@ -216,7 +216,7 @@ export async function generatePracticeText(params: {
     length,
     keyVocabulary: finalTemplate.keyVocabulary,
     suggestedBlankWords: finalTemplate.suggestedBlankWords,
-    estimatedDifficulty: difficultyMap[cefrLevel],
+    estimatedDifficulty: `${cefrLevel} difficulty ${difficultyMap[cefrLevel]}/10`,
     createdAt: new Date(),
   };
 }

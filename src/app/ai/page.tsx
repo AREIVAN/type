@@ -7,7 +7,7 @@ import Link from 'next/link';
 import { Header } from '@/components/layout/Header';
 import { AIGenerator } from '@/components/features/ai/AIGenerator';
 import { generatePracticeText } from '@/services/ai-service';
-import { CEFRLevel, PracticeGoal, Length, GeneratedContent, SpanishHints, BlanksMode } from '@/types';
+import { CEFRLevel, Length, GeneratedContent, SpanishHints, BlanksMode, PracticeObjective, PracticeTopic, AISessionMetadata } from '@/types';
 
 export default function AIPage() {
   const router = useRouter();
@@ -17,8 +17,11 @@ export default function AIPage() {
 
   const handleGenerate = useCallback(async (params: { 
     cefrLevel: CEFRLevel; 
-    practiceGoal: PracticeGoal; 
+    topic: PracticeTopic;
+    objective: PracticeObjective;
     length: Length;
+    useWeakWords: boolean;
+    weakWords: string[];
     learningSupport?: { spanishHints: SpanishHints; blanksMode: BlanksMode };
   }) => {
     setIsGenerating(true);
@@ -27,8 +30,11 @@ export default function AIPage() {
     try {
       const content = await generatePracticeText({
         cefrLevel: params.cefrLevel,
-        practiceGoal: params.practiceGoal,
+        topic: params.topic,
+        objective: params.objective,
         length: params.length,
+        useWeakWords: params.useWeakWords,
+        weakWords: params.weakWords,
         learningSupport: params.learningSupport,
       });
       setGeneratedContent(content);
@@ -48,16 +54,28 @@ export default function AIPage() {
     sessionStorage.setItem('practice_text', content.text);
     sessionStorage.setItem('practice_source', 'ai');
     sessionStorage.setItem('practice_title', content.title || 'AI Practice');
+    const metadata: AISessionMetadata = {
+      type: 'ai',
+      generationSource: content.generationSource ?? 'ai',
+      cefrLevel: content.cefrLevel ?? 'B1',
+      topic: content.topic ?? 'daily-conversation',
+      objective: content.objective ?? 'reading-fluency',
+      weakWordsUsed: content.weakWordsUsed ?? [],
+      technicalVocabularyUsed: content.technicalVocabularyUsed ?? [],
+      textLength: content.length ?? 'medium',
+      title: content.title || 'AI Practice',
+    };
+    sessionStorage.setItem('practice_metadata', JSON.stringify(metadata));
     
     // Store CEFR and practice goal for future features
     if (content.cefrLevel) {
       sessionStorage.setItem('practice_cefr', content.cefrLevel);
     }
-    if (content.practiceGoal) {
-      sessionStorage.setItem('practice_goal', content.practiceGoal);
+    if (content.objective) {
+      sessionStorage.setItem('practice_goal', content.objective);
     }
-    if (content.keyVocabulary) {
-      sessionStorage.setItem('practice_vocabulary', JSON.stringify(content.keyVocabulary));
+    if (content.keywordsUsed) {
+      sessionStorage.setItem('practice_vocabulary', JSON.stringify(content.keywordsUsed));
     }
     if (content.suggestedBlankWords) {
       sessionStorage.setItem('practice_blanks', JSON.stringify(content.suggestedBlankWords));

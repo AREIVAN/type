@@ -1,5 +1,5 @@
 // Local storage utilities
-import { VerbPracticeItem, VerbSessionMetadata } from '@/types';
+import { SessionMetadata, VerbPracticeItem } from '@/types';
 
 const PREFIX = 'typelearn_';
 
@@ -47,7 +47,7 @@ export interface StoredSession {
   errors: number;
   time: number;
   completedAt: string;
-  metadata?: VerbSessionMetadata;
+  metadata?: SessionMetadata;
 }
 
 const FAILED_VERBS_KEY = 'failed_verbs';
@@ -59,7 +59,7 @@ export function getFailedVerbs(): VerbPracticeItem[] {
 export function saveFailedVerbs(items: VerbPracticeItem[]): void {
   const unique = new Map<string, VerbPracticeItem>();
   for (const item of items) {
-    unique.set(item.text.trim().toLowerCase(), item);
+    unique.set(`${item.base || item.text}:${item.targetForm ?? 'base'}`.trim().toLowerCase(), item);
   }
 
   setItem(FAILED_VERBS_KEY, Array.from(unique.values()).slice(0, 50));
@@ -101,6 +101,42 @@ export function saveRecentWord(word: StoredWord): void {
   }
   words.unshift(word);
   setItem(WORDS_KEY, words.slice(0, 50));
+}
+
+function normalizeWeakWord(value: string): string | null {
+  const normalized = value.trim().toLowerCase().replace(/[^a-z' -]/g, '').trim();
+  if (normalized.length < 3 || normalized.length > 30) {
+    return null;
+  }
+
+  return normalized;
+}
+
+export function getWeakWords(limit = 12): string[] {
+  const words = new Set<string>();
+
+  for (const item of getFailedVerbs()) {
+    const candidates = [item.text, item.base, item.pastSimple, item.pastParticiple, item.gerund, item.thirdPerson];
+    for (const candidate of candidates) {
+      if (typeof candidate !== 'string') {
+        continue;
+      }
+
+      const normalized = normalizeWeakWord(candidate);
+      if (normalized) {
+        words.add(normalized);
+      }
+    }
+  }
+
+  for (const item of getRecentWords()) {
+    const normalized = normalizeWeakWord(item.word);
+    if (normalized) {
+      words.add(normalized);
+    }
+  }
+
+  return Array.from(words).slice(0, limit);
 }
 
 // Settings storage
