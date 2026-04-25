@@ -36,18 +36,6 @@ export default function VerbsPage() {
   const [isCompleted, setIsCompleted] = useState(false);
   const hiddenInputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    if (!startedAt || isCompleted) {
-      return;
-    }
-
-    const interval = window.setInterval(() => {
-      setElapsed((Date.now() - startedAt) / 1000);
-    }, 250);
-
-    return () => window.clearInterval(interval);
-  }, [startedAt, isCompleted]);
-
   const completedResults = useMemo(() => Object.values(results), [results]);
   const orderedResults = useMemo(
     () => items.map(item => results[item.id]).filter((result): result is VerbPracticeAnswerResult => Boolean(result)),
@@ -60,6 +48,19 @@ export default function VerbsPage() {
   const accuracy = completedResults.length === 0 ? 100 : Math.round((correctCount / completedResults.length) * 100);
   const typedCharacters = orderedResults.reduce((total, result) => total + result.answer.length, 0) + currentInput.length;
   const wpm = elapsed > 0 ? Math.round(typedCharacters / 5 / (elapsed / 60)) : 0;
+  const isSessionFinished = items.length > 0 && completedResults.length === items.length;
+
+  useEffect(() => {
+    if (!startedAt || isCompleted || isSessionFinished) {
+      return;
+    }
+
+    const interval = window.setInterval(() => {
+      setElapsed((Date.now() - startedAt) / 1000);
+    }, 250);
+
+    return () => window.clearInterval(interval);
+  }, [startedAt, isCompleted, isSessionFinished]);
 
   useEffect(() => {
     if (items.length > 0 && !isCompleted) {
@@ -130,7 +131,10 @@ export default function VerbsPage() {
       },
     }));
     setCurrentInput('');
-  }, [currentIndex, currentInput, items]);
+    if (startedAt && currentIndex === items.length - 1) {
+      setElapsed((Date.now() - startedAt) / 1000);
+    }
+  }, [currentIndex, currentInput, items, startedAt]);
 
   const handleBackspaceFromEmptyInput = useCallback(() => {
     hiddenInputRef.current?.focus();
@@ -175,7 +179,7 @@ export default function VerbsPage() {
     setMessage(failed.length > 0 ? `${failed.length} missed verb(s) will appear again later.` : 'Perfect. No failed verbs saved.');
   }, [addToHistory, count, elapsed, generationSource, items, results, track]);
 
-  const canComplete = items.length > 0 && completedResults.length === items.length;
+  const canComplete = isSessionFinished;
   const trackSummary = track === 'technical-engineering' ? 'Technical Engineering' : `${track} ${track === 'A1' ? 'Beginner' : track === 'A2' ? 'Elementary' : track === 'B1' ? 'Intermediate' : track === 'B2' ? 'Upper Intermediate' : 'Advanced'}`;
 
   return (
@@ -225,7 +229,7 @@ export default function VerbsPage() {
                   errors={incorrectCount}
                   time={elapsed}
                   progress={progress}
-                  status={isCompleted ? 'completed' : 'active'}
+                  status={isSessionFinished ? 'completed' : 'active'}
                 />
               </div>
 
